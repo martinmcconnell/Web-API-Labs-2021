@@ -19,7 +19,12 @@ router.post('/',asyncHandler( async (req, res, next) => {
       return next();
     }
     if (req.query.action === 'register') {
-      await User.create(req.body);
+        if(/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{5,}$/.test(req.body.password)) {
+            await User.create(req.body).catch(next);
+        } 
+        else {
+            res.status(401).json({code: 401,msg: 'Authentication failed. Password to weak'});
+        }
       res.status(201).json({code: 201, msg: 'Successful created new user.'});
     } else {
       const user = await User.findByUserName(req.body.username);
@@ -40,13 +45,13 @@ router.post('/',asyncHandler( async (req, res, next) => {
 // Update a user
 router.put('/:id', async (req, res) => {
 if (req.body._id) delete req.body._id;
-const result = await User.updateOne({
-    _id: req.params.id,
-    }, req.body);
-    if (result.matchedCount) {
-        res.status(200).json({ code:200, msg: 'User Updated Sucessfully' });
-    } else {
-        res.status(404).json({ code: 404, msg: 'Unable to Update User' });
+    const result = await User.updateOne({
+        _id: req.params.id,
+        }, req.body);
+        if (result.matchedCount) {
+            res.status(200).json({ code:200, msg: 'User Updated Sucessfully' });
+        } else {
+            res.status(404).json({ code: 404, msg: 'Unable to Update User' });
     }
 });
 
@@ -57,14 +62,17 @@ router.post('/:userName/favourites', asyncHandler(async (req, res) => {
     const movie = await movieModel.findByMovieDBId(newFavourite);
     const user = await User.findByUserName(userName);
     await user.favourites.push(movie._id);
+    // remove duplicates
+    if(await user.favourites.includes(movie.id))
+        await user.favourites.push(movie._id);
     await user.save(); 
     res.status(201).json(user); 
-  }));
+}));
 
 router.get('/:userName/favourites', asyncHandler( async (req, res) => {
-const userName = req.params.userName;
-const user = await User.findByUserName(userName).populate('favourites');
-res.status(200).json(user.favourites);
+    const userName = req.params.userName;
+    const user = await User.findByUserName(userName).populate('favourites');
+    res.status(200).json(user.favourites);
 }));
 
 export default router; 
